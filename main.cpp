@@ -13,41 +13,47 @@
 #define LedVid 12
 #define LedAlu 13
 
-// Salidas motor a pasos
+// Salidas driver para motor a pasos
 #define stepPin 22
 #define dirPin 23
 #define sHall 24
 
 // Boton que controla el inicio del proceso
 #define BotonInicio 26
-#define BotonDeposito 27
 
-// Variables que almacenan el estado de cada se sensor
-/*bool SensPET;
-bool SensVid;
-bool SensAlu;*/
+// Sensor de salida de rampa
+#define SensInfraRampa 27
 
-// Variable que controla la secuencia del proceso
+// Variable que controla la secuencia de la maquina de estados
 int Etapa;
 
-// Variable que guarda la direccion de rotacion del motor PAP
-int sentidoRot; // tiene 3 valores, 0 para posicion central, 1 para derecha, -1 para izquierda
+int sentidoRot;
+
+// Variable que guarda el valor de lectura de cada sensor
+bool sensPET;
+bool sensVid;
+bool sensAlu;
 
 Servo servoMotor;
 
-LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27 for a 20 chars and 4 line display
+
+void LEDS(); // Funcion que controla los leds que indican la deteccion de cada sensor
 
 void setup()
 {
   lcd.init(); // initialize the lcd
   lcd.backlight();
   lcd.clear();
-  Serial.begin(9600);
+
+  Serial.begin(9600); // Initialize serial
+
   // Pines motor a pasos
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin, OUTPUT);
   pinMode(sHall, INPUT);
 
+  // Pines sensores capacitivos, inductivo y sus respectivos leds
   pinMode(SensCap_PET, INPUT);
   pinMode(SensCap_Vid, INPUT);
   pinMode(SensInd_Alu, INPUT);
@@ -55,72 +61,39 @@ void setup()
   pinMode(LedVid, OUTPUT);
   pinMode(LedAlu, OUTPUT);
 
-  pinMode(BotonDeposito, INPUT);
+  // Boton de inicio y sensor salida de rampa
+  pinMode(SensInfraRampa, INPUT);
   pinMode(BotonInicio, INPUT);
 
+  // Pines driver para motor PAP
   pinMode(dirPin, OUTPUT);
   pinMode(stepPin, OUTPUT);
   pinMode(sHall, INPUT);
-  servoMotor.attach(9);
-  /*
-    while (sHall == LOW)
-    { // Mientras no detecte se mueve
-      digitalWrite(stepPin, HIGH);
-      delayMicroseconds(700); // by changing this time delay between the steps we can change the rotation speed
-      digitalWrite(stepPin, LOW);
-      delayMicroseconds(700);
-    }*/
 
+  // Salida servo que eleva la rampa
+  servoMotor.attach(9);
+  
+  // Se inicializa la FSM en la etapa primer etapa (0)
   Etapa = 0;
 }
 
 void loop()
 {
-  // SensPET == digitalRead(SensCap_PET);
-  // SensAlu == digitalRead(SensInd_Alu);
-  // SensVid == digitalRead(SensCap_Vid);
-
-  // Usuario coloca el envase en el espacio designado
-  // Se muestra en pantalla "Ingresa un envase y presiona el boton de inicio "
-
-  if (digitalRead(SensCap_PET) == LOW)
-  {
-    digitalWrite(LedPET, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedPET, LOW);
-  }
-
-  if (digitalRead(SensCap_Vid) == LOW)
-  {
-    digitalWrite(LedVid, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedVid, LOW);
-  }
-
-  if (digitalRead(SensInd_Alu) == HIGH)
-  {
-    digitalWrite(LedAlu, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedAlu, LOW);
-  }
+  sensAlu = digitalRead(SensInd_Alu);
+  sensPET = digitalRead(SensCap_PET);
+  sensVid = digitalRead(SensCap_Vid);
 
   switch (Etapa)
   {
   case 0:
     // Mientras no detecte ningun envase se solicitara colocar uno
-
     lcd.setCursor(0, 0);
     lcd.print("Coloca un envase");
     Serial.println("Coloca un envase");
     delay(200);
-    // checar estados de activacion
-    if ((digitalRead(SensCap_PET) == LOW || digitalRead(SensCap_Vid) == LOW || digitalRead(SensInd_Alu) == HIGH))
+
+    // Verificar si se detecta algun envase
+    if (sensPET == LOW || sensVid == LOW || sensAlu == HIGH)
     {
       lcd.clear();
       Etapa = 1; // Se detecta algun envase, cambia de etapa
@@ -142,23 +115,24 @@ void loop()
     break;
 
   case 2:
-    lcd.clear();
+    // lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Ingresaste:");
-    delay(200);
+    delay(100);
+
     // Indica en la LCD el tipo de material ingresado
-    if (digitalRead(SensCap_PET) == LOW || digitalRead(SensCap_Vid) == LOW || digitalRead(SensInd_Alu) == HIGH)
-    { // si algun sensor detecta se ejecuta esto
+    if (sensPET == LOW || SensCap_Vid == LOW || sensAlu == HIGH)
+    { // si algun sensor detecta se ejecuta
 
       lcd.setCursor(6, 2);
-      // Muestra en pantalla que esta detectando Lata aluminio
-      if (digitalRead(SensInd_Alu) == HIGH && digitalRead(SensCap_Vid) == LOW && digitalRead(SensCap_PET) == LOW)
+      // Muestra en pantalla que esta detectando Lata
+      if (sensAlu == HIGH && sensVid == LOW && sensPET == LOW)
       {
         lcd.print("Lata");
-        delay(1000);
-        ///////////////////////////////////////
+        Serial.println("Lata");
+
         // Se mueve el motor PAP hasta la posicion de la rampa de salida de LATAS:
-        // DERECHA
+        // Derecha
         digitalWrite(dirPin, LOW);
         sentidoRot = 1;
         // gira en sentido hacia la rampa de salida de LATAS
@@ -169,18 +143,19 @@ void loop()
           digitalWrite(stepPin, LOW);
           delayMicroseconds(500);
         }
-        delay(100);
         //////////////////////////////////
+
+        delay(1000);
       }
+
       // Muestra en pantalla que esta detectando vidrio
       else if (digitalRead(SensCap_Vid) == LOW && digitalRead(SensCap_PET) == LOW)
       {
         lcd.print("Vidrio");
-        delay(1000);
         Serial.println("Vidrio");
+
         // Se mueve el motor PAP hasta la posicion de la rampa de salida de Vidrio:
         // IZQUIERDA
-        ///////////////////////////////////////
         digitalWrite(dirPin, HIGH);
         sentidoRot = 2;
         // gira en sentido hacia la rampa de salida de Vidrio
@@ -193,33 +168,45 @@ void loop()
         }
         //////////////////////////////////
 
-        delay(100);
+        delay(1000);
       }
+
       // Muestra en pantalla que esta detectando PET
-      else if (digitalRead(SensCap_PET) == LOW)
+      else if (sensPET == LOW)
       {
         lcd.print("PET");
-        delay(1000);
+
         // POSICION CENTRAL, NO ROTA
         digitalWrite(stepPin, LOW); // no gira el motor central, su salida esla rampa del centro
         sentidoRot = 0;
+
+        delay(2000);
       }
 
-      delay(200);
-      lcd.clear();
+      delay(100);  // se puede eliminar
+      lcd.clear(); // Limpia LCD
       Etapa = 3;
-      break;
     }
-    break;
 
-  case 3:
-    // lcd.clear();
+    /*
+    Agregar un else para un estado de error ya que no hay envase, o no funcionan correctamente los sensores
+    Estado de error despues de un tiempo de no deteccion */
+
+    break; // si no funciona, mover arriba de la llave
+
+  case 3: /*En este estado se indica al usuario que se esta depositando el envase
+          Y detecta su salida de la rampa*/
+
+    /* lcd.clear();
+     En este estado se eleva la rampa pequeña para empujar el envase hacia la rampa de salida*/
     lcd.setCursor(0, 0);
-    lcd.print("Depositando"); // Activa el servo para empujar el envase
+    lcd.print("Depositando");
     lcd.setCursor(4, 1);
     lcd.print("Envase");
-    delay(100);
-    servoMotor.write(90); // Se inclina la rampa
+
+    servoMotor.write(90); // Se eleva la rampa
+
+    delay(200);
 
     /*if (sentidoRot = 1)
     { // giro a la derecha
@@ -254,25 +241,59 @@ void loop()
       // No retorna porque se mantuvo en la posicion
       sentidoRot = 5;
     }*/
+    // revisar si el tiempo de arriba es menor al tiempo que le toma al envase llegar al sensor de salida de la rampa (200ms)
 
-    if (digitalRead(BotonDeposito) == HIGH) // Sensore de salida de rampa detecta el envase que ha salido
+    if (digitalRead(SensInfraRampa) == HIGH) // Sensore de salida de rampa detecta que el envase a ha salido
     {
       lcd.clear();
       lcd.print("LISTO PATRON");
       delay(1500);
-      servoMotor.write(0); // Regresa a la posicion inicial(plano, horizontal)
-      Etapa = 0;
 
-      lcd.clear();
+      servoMotor.write(0); // Regresa a la posicion inicial(plano, horizontal)
+
+      Etapa = 0; // Se reinicia la FSM, vuelve al estado inicial 0
+
+      lcd.clear(); // Limpia la LCD
     }
 
     break;
 
   default:
-    lcd.print("HOLA");
-    break;
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ESTO NO DEBERIA ESTAR SUCEDIENDO");
     delay(500);
+    break;
   }
 }
 
-// hall e infra mandan 0 al detectar
+void LEDS()
+{
+
+  if (sensPET == LOW)
+  {
+    digitalWrite(LedPET, HIGH);
+  }
+  else
+  {
+    digitalWrite(LedPET, LOW);
+  }
+
+  if (sensVid == LOW)
+  {
+    digitalWrite(LedVid, HIGH);
+  }
+  else
+  {
+    digitalWrite(LedVid, LOW);
+  }
+
+  if (sensAlu == HIGH)
+  {
+    digitalWrite(LedAlu, HIGH);
+  }
+  else
+  {
+    digitalWrite(LedAlu, LOW);
+  }
+}
