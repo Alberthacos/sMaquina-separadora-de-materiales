@@ -32,7 +32,7 @@ bool SensVid;
 bool SensAlu;*/
 
 // Variable que controla la secuencia del proceso
-int Etapa;
+int Estado;
 
 Servo servoMotor;
 
@@ -69,17 +69,17 @@ void setup()
   stepper1.setAcceleration(1000); // Set acceleration value for the stepper
   stepper1.setCurrentPosition(0); // Set the current position to 0 steps
 
-  Etapa = 0;
+  Estado = 0;
 }
 
 void loop()
 {
-  // SensPET == digitalRead(SensCap_PET);
-  // SensAlu == digitalRead(SensInd_Alu);
-  // SensVid == digitalRead(SensCap_Vid);
+  /* SensPET == digitalRead(SensCap_PET);
+   SensAlu == digitalRead(SensInd_Alu);
+   SensVid == digitalRead(SensCap_Vid);*/
 
-  // Usuario coloca el envase en el espacio designado
-  // Se muestra en pantalla "Ingresa un envase y presiona el boton de inicio "
+  /* Usuario coloca el envase en el espacio designado
+   Se muestra en pantalla "Ingresa un envase y presiona el boton de inicio"*/
 
   // ESTADO LEDS DE SENSORES
   if (digitalRead(SensCap_PET) == LOW)
@@ -109,8 +109,8 @@ void loop()
     digitalWrite(LedAlu, LOW);
   }
 
-  // MAQUINA DE ESTADOS GENERAL
-  switch (Etapa)
+  // MAQUINA DE ESTADOS
+  switch (Estado)
   {
   case 0: // SOLICITA ENVASE
 
@@ -124,8 +124,8 @@ void loop()
     if ((digitalRead(SensCap_PET) == LOW || digitalRead(SensCap_Vid) == LOW || digitalRead(SensInd_Alu) == HIGH))
     {
       lcd.clear();
-      Serial.println("Envase detectado");
-      Etapa = 1; // Se detecta algun envase, cambia de estado
+      Serial.println("Envase detectado, se cambia al estado 1");
+      Estado = 1; // Se detecta algun envase, cambia de estado
     }
     break;
 
@@ -133,10 +133,12 @@ void loop()
     if (digitalRead(BotonInicio) == HIGH) // si se presiona el boton de inicio de proceso
                                           // Cambia a la siguiente etapa que es discriminacion material
     {
+      Serial.println("El usuario ha presionado el boton de inicio");
       lcd.clear();
-      Etapa = 2;
+      Estado = 2;
     }
     // Se mantiene el siguiente texto hasta que se presione le boton de inicio
+    Serial.println("Se le solicita al usuario presionar el boton de inicio");
     lcd.setCursor(0, 0);
     lcd.print("Presiona boton");
     lcd.setCursor(3, 1);
@@ -148,6 +150,7 @@ void loop()
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Ingresaste:");
+     Serial.println("Se ha cambiado al estado 2, donde se indica el material detectado");
     delay(200);
 
     // INDICA en la LCD el tipo de MATERIAL INGRESADO
@@ -199,7 +202,7 @@ void loop()
 
       delay(200);
       lcd.clear();
-      Etapa = 3;
+      Estado = 3;
       break;
     }
     break;
@@ -212,30 +215,37 @@ void loop()
     lcd.setCursor(4, 1);
     lcd.print("Envase");
     delay(100);
-    servoMotor.write(90); // Se eleva la rampa
+    Serial.println("rota el 90 grados el servomotor para elevar la rampa y retorna al centro el motor PAP");
+    servoMotor.write(90); // Se eleva la rampa con ayuda del servomotor
 
-    //MODIFICAR VALOR CORRECTO PARA MOVERLO AL CENTRO
-    stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
-    stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
-
+    
     if (digitalRead(BotonDeposito) == HIGH) // Sensore de salida de rampa detecta el envase que ha salido
     {
       lcd.clear();
       lcd.print("LISTO PATRON");
       delay(1500);
       servoMotor.write(0); // Regresa a la posicion inicial(plano, horizontal)
-      Etapa = 0;
+      
+      //MODIFICAR VALOR CORRECTO PARA MOVERLO AL CENTRO
+      stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+      stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
 
+      Serial.println("El sensor al final de la rampa ha detectado la salida del envasase y vuelven los motores a la posicion incial ");
+      //Se reinicia la maquina de estados
+      Estado = 0;
       lcd.clear();
     }
-
     break;
 
   default:
-    lcd.print("HOLA");
+    lcd.print("HOLA, NO deberias leer esto");
     break;
     delay(500);
   }
 }
+/*COMENTARIOS FUNCIONAMIENTO O CONEXION 
 
-// hall e infra mandan 0 al detectar
+ hall e infra mandan 0 al detectar
+
+*/
+
