@@ -4,32 +4,29 @@
 #include <Servo.h>
 #include <AccelStepper.h>
 
+// Salidas motor a pasos
+#define DirPin 3
+#define StepPin 2
 // Define the stepper motor and the pins that is connected to
-AccelStepper stepper1(1, 2, 5); // (Type of driver: with 2 pins, STEP, DIR)
+AccelStepper stepper1(1, StepPin, DirPin); // (Type of driver: with 2 pins, STEP, DIR)
 
 // Entradas de los sensores
-#define SensCap_PET 6
-#define SensCap_Vid 7
-#define SensInd_Alu 8
+#define SensInd_Alu 4
+#define SensCap_PET 5
+#define SensCap_Vid 6
 
-// LEDS SENSORES
-#define LedPET 11
-#define LedVid 12
-#define LedAlu 13
-
-// Salidas motor a pasos
-#define stepPin 22
-#define dirPin 23
-#define sHall 24
+/*// LEDS SENSORES
+#define LedAlu 12
+#define LedVid 7
+#define LedPET 13
+*/
+// Pin servomotor
+#define ServPin 9
 
 // Boton que controla el inicio del proceso
-#define BotonInicio 26
-#define BotonDeposito 27
-
-// Variables que almacenan el estado de cada se sensor
-/*bool SensPET;
-bool SensVid;
-bool SensAlu;*/
+#define BotonInicio 12
+// Boton que detecta la salida del envase de la rampa
+#define SensorSalida 13
 
 // Variable que controla la secuencia del proceso
 int Estado;
@@ -45,24 +42,24 @@ void setup()
   lcd.clear();
   Serial.begin(9600);
   // Pines motor a pasos
-  pinMode(stepPin, OUTPUT);
-  pinMode(dirPin, OUTPUT);
-  pinMode(sHall, INPUT);
+  pinMode(StepPin, OUTPUT);
+  pinMode(DirPin, OUTPUT);
 
   pinMode(SensCap_PET, INPUT);
   pinMode(SensCap_Vid, INPUT);
   pinMode(SensInd_Alu, INPUT);
-  pinMode(LedPET, OUTPUT);
-  pinMode(LedVid, OUTPUT);
-  pinMode(LedAlu, OUTPUT);
+  /*
+    pinMode(LedPET, OUTPUT);
+    pinMode(LedVid, OUTPUT);
+    pinMode(LedAlu, OUTPUT);*/
 
-  pinMode(BotonDeposito, INPUT);
   pinMode(BotonInicio, INPUT);
+  pinMode(SensorSalida, INPUT);
 
-  pinMode(dirPin, OUTPUT);
-  pinMode(stepPin, OUTPUT);
-  pinMode(sHall, INPUT);
-  servoMotor.attach(9);
+  pinMode(DirPin, OUTPUT);
+  pinMode(StepPin, OUTPUT);
+
+  servoMotor.attach(ServPin);
 
   // Set maximum speed value for the stepper
   stepper1.setMaxSpeed(1000);
@@ -80,34 +77,34 @@ void loop()
 
   /* Usuario coloca el envase en el espacio designado
    Se muestra en pantalla "Ingresa un envase y presiona el boton de inicio"*/
+  /*
+    // ESTADO LEDS DE SENSORES
+    if (digitalRead(SensCap_PET) == LOW)
+    {
+      digitalWrite(LedPET, HIGH);
+    }
+    else
+    {
+      digitalWrite(LedPET, LOW);
+    }
 
-  // ESTADO LEDS DE SENSORES
-  if (digitalRead(SensCap_PET) == LOW)
-  {
-    digitalWrite(LedPET, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedPET, LOW);
-  }
+    if (digitalRead(SensCap_Vid) == LOW)
+    {
+      digitalWrite(LedVid, HIGH);
+    }
+    else
+    {
+      digitalWrite(LedVid, LOW);
+    }
 
-  if (digitalRead(SensCap_Vid) == LOW)
-  {
-    digitalWrite(LedVid, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedVid, LOW);
-  }
-
-  if (digitalRead(SensInd_Alu) == HIGH)
-  {
-    digitalWrite(LedAlu, HIGH);
-  }
-  else
-  {
-    digitalWrite(LedAlu, LOW);
-  }
+    if (digitalRead(SensInd_Alu) == HIGH)
+    {
+      digitalWrite(LedAlu, HIGH);
+    }
+    else
+    {
+      digitalWrite(LedAlu, LOW);
+    }*/
 
   // MAQUINA DE ESTADOS
   switch (Estado)
@@ -115,10 +112,11 @@ void loop()
   case 0: // SOLICITA ENVASE
 
     // Mientras no detecte ningun envase se solicitara colocar uno
+    lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Coloca un envase");
     Serial.println("Coloca un envase (caso 0)");
-    delay(200);
+    delay(100);
 
     // leer estados de sensores
     if ((digitalRead(SensCap_PET) == LOW || digitalRead(SensCap_Vid) == LOW || digitalRead(SensInd_Alu) == HIGH))
@@ -135,6 +133,7 @@ void loop()
     {
       Serial.println("El usuario ha presionado el boton de inicio");
       lcd.clear();
+      delay(500);
       Estado = 2;
     }
     // Se mantiene el siguiente texto hasta que se presione le boton de inicio
@@ -150,7 +149,7 @@ void loop()
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Ingresaste:");
-     Serial.println("Se ha cambiado al estado 2, donde se indica el material detectado");
+    Serial.println("Se ha cambiado al estado 2, donde se indica el material detectado");
     delay(200);
 
     // INDICA en la LCD el tipo de MATERIAL INGRESADO
@@ -161,46 +160,57 @@ void loop()
       lcd.setCursor(6, 2);
 
       // Muestra en pantalla que esta DETECTANDO LATA ALUMINIO
-      if (digitalRead(SensInd_Alu) == HIGH && digitalRead(SensCap_Vid) == LOW && digitalRead(SensCap_PET) == LOW)
+      if ((digitalRead(SensInd_Alu) == HIGH) && (digitalRead(SensCap_Vid) == LOW) && (digitalRead(SensCap_PET) == LOW))
       {
         lcd.print("Lata");
-        delay(1000);
+        Serial.println("se detecto Lata aluminio");
 
         // Se MUEVE el motor PAP hasta la posicion de la rampa de salida de LATAS:
         // DERECHA
         // MODIFICAR CON EL VALOR CORRECTO
         stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in  position
-        delay(100);
+        delay(200);
+      
       }
 
       // Muestra en pantalla que esta DETECTANDO VIDRIO
       else if (digitalRead(SensCap_Vid) == LOW && digitalRead(SensCap_PET) == LOW)
       {
         lcd.print("Vidrio");
-        delay(1000);
-        Serial.println("Vidrio");
+        Serial.println("se detecto Vidrio");
+        delay(200);
 
         // Se mueve el motor PAP hasta la posicion de la rampa de salida de Vidrio:
         // IZQUIERDA
         // MODIFICAR CON EL VALOR CORRECTO
-        stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        stepper1.moveTo(600);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
-        delay(100);
+        delay(200);
       }
 
       // Muestra en pantalla que esta DETECTANDO PET
-      else if (digitalRead(SensCap_PET) == LOW)
+      else if ((digitalRead(SensCap_PET) == LOW) && digitalRead(SensCap_Vid) == HIGH && digitalRead(SensInd_Alu) == LOW)
       {
         lcd.print("PET");
-        delay(1000);
+        Serial.println("Se detecto PET");
+        delay(200);
         // POSICION CENTRAL, NO ROTA
         // MODIFICAR CON EL VALOR CORRECTO
-        stepper1.moveTo(0);       // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        stepper1.moveTo(200);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
       }
+      else
+      {
+        lcd.clear();
+        lcd.setCursor(2, 1);
+        lcd.print("Material no");
+        lcd.setCursor(2, 2);
+        lcd.print("Reconocido");
+        Serial.println("No se ha determinado que material se ha ingresado");
+      }
 
-      delay(200);
+      delay(1500);
       lcd.clear();
       Estado = 3;
       break;
@@ -210,42 +220,44 @@ void loop()
   case 3:
     // Indica que el envase se va a depositar en el contenedor
     //  Activa el servo para empujar el envase y se detecta su salida con un sensor al final de la rampa
+    lcd.clear();
+    lcd.setCursor(2, 1);
     lcd.print("Depositando");
-    lcd.setCursor(0, 0);
-    lcd.setCursor(4, 1);
+    lcd.setCursor(4, 2);
     lcd.print("Envase");
-    delay(100);
-    Serial.println("rota el 90 grados el servomotor para elevar la rampa y retorna al centro el motor PAP");
+    delay(200);
+
+    Serial.println("rota 90 grados el servomotor para elevar la rampa");
     servoMotor.write(90); // Se eleva la rampa con ayuda del servomotor
 
-    
-    if (digitalRead(BotonDeposito) == HIGH) // Sensore de salida de rampa detecta el envase que ha salido
+    if (digitalRead(SensorSalida) == HIGH) // Sensore de salida de rampa detecta el envase que ha salido
     {
+    Serial.println("Ha detectado la salida del envase de la rampa");
       lcd.clear();
-      lcd.print("LISTO PATRON");
-      delay(1500);
+      lcd.print("Ya quedo jefe");
+      delay(100);
       servoMotor.write(0); // Regresa a la posicion inicial(plano, horizontal)
-      
-      //MODIFICAR VALOR CORRECTO PARA MOVERLO AL CENTRO
-      stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+
+      // MODIFICAR VALOR CORRECTO PARA MOVERLO AL CENTRO
+      Serial.println("retorna al centro el motor PAP");
+      stepper1.moveTo(0);       // Set desired move: 800 steps (in quater-step resolution that's one rotation)
       stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
 
       Serial.println("El sensor al final de la rampa ha detectado la salida del envasase y vuelven los motores a la posicion incial ");
-      //Se reinicia la maquina de estados
+      // Se reinicia la maquina de estados
       Estado = 0;
-      lcd.clear();
     }
     break;
 
   default:
+    lcd.clear();
     lcd.print("HOLA, NO deberias leer esto");
+    delay(200);
     break;
-    delay(500);
   }
 }
-/*COMENTARIOS FUNCIONAMIENTO O CONEXION 
+/*COMENTARIOS FUNCIONAMIENTO O CONEXION
 
  hall e infra mandan 0 al detectar
-
+Agregar caso default si todos los sensores no detectan su combinacion
 */
-
