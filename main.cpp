@@ -4,29 +4,33 @@
 #include <Servo.h>
 #include <AccelStepper.h>
 
-// Salidas motor a pasos
+// Salidas para driver motor a pasos
 #define DirPin 3
 #define StepPin 2
 // Define the stepper motor and the pins that is connected to
 AccelStepper stepper1(1, StepPin, DirPin); // (Type of driver: with 2 pins, STEP, DIR)
+#define EnablePin 30
 
 // Entradas de los sensores
 #define SensInd_Alu 4
 #define SensCap_PET 5
 #define SensCap_Vid 6
 
-/*// LEDS SENSORES
-#define LedAlu 12
-#define LedVid 7
-#define LedPET 13
-*/
+// LEDS SENSORES
+#define LedAlu 7
+#define LedVid 9
+#define LedPET 10
+
 // Pin servomotor
-#define ServPin 9
+#define PinServo 11
 
 // Boton que controla el inicio del proceso
 #define BotonInicio 12
 // Boton que detecta la salida del envase de la rampa
 #define SensorSalida 13
+
+// Variable que configura la posicion de origen
+#define sensor_origen 22
 
 // Variable que controla la secuencia del proceso
 int Estado;
@@ -34,6 +38,8 @@ int Estado;
 Servo servoMotor;
 
 LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+void zero_motor();
 
 void setup()
 {
@@ -48,10 +54,10 @@ void setup()
   pinMode(SensCap_PET, INPUT);
   pinMode(SensCap_Vid, INPUT);
   pinMode(SensInd_Alu, INPUT);
-  /*
-    pinMode(LedPET, OUTPUT);
-    pinMode(LedVid, OUTPUT);
-    pinMode(LedAlu, OUTPUT);*/
+
+  pinMode(LedPET, OUTPUT);
+  pinMode(LedVid, OUTPUT);
+  pinMode(LedAlu, OUTPUT);
 
   pinMode(BotonInicio, INPUT);
   pinMode(SensorSalida, INPUT);
@@ -59,63 +65,33 @@ void setup()
   pinMode(DirPin, OUTPUT);
   pinMode(StepPin, OUTPUT);
 
-  servoMotor.attach(ServPin);
+  servoMotor.attach(PinServo);
 
-  // Set maximum speed value for the stepper
+  pinMode(sensor_origen, INPUT);
+
+  servoMotor.write(0);
   stepper1.setMaxSpeed(1000);
-  stepper1.setAcceleration(1000); // Set acceleration value for the stepper
+  stepper1.setAcceleration(500);  // Set acceleration value for the stepper
   stepper1.setCurrentPosition(0); // Set the current position to 0 steps
 
+  zero_motor();
   Estado = 0;
 }
 
 void loop()
 {
-  /* SensPET == digitalRead(SensCap_PET);
-   SensAlu == digitalRead(SensInd_Alu);
-   SensVid == digitalRead(SensCap_Vid);*/
-
-  /* Usuario coloca el envase en el espacio designado
-   Se muestra en pantalla "Ingresa un envase y presiona el boton de inicio"*/
-  /*
-    // ESTADO LEDS DE SENSORES
-    if (digitalRead(SensCap_PET) == LOW)
-    {
-      digitalWrite(LedPET, HIGH);
-    }
-    else
-    {
-      digitalWrite(LedPET, LOW);
-    }
-
-    if (digitalRead(SensCap_Vid) == LOW)
-    {
-      digitalWrite(LedVid, HIGH);
-    }
-    else
-    {
-      digitalWrite(LedVid, LOW);
-    }
-
-    if (digitalRead(SensInd_Alu) == HIGH)
-    {
-      digitalWrite(LedAlu, HIGH);
-    }
-    else
-    {
-      digitalWrite(LedAlu, LOW);
-    }*/
-
   // MAQUINA DE ESTADOS
   switch (Estado)
   {
   case 0: // SOLICITA ENVASE
 
+    digitalWrite(EnablePin, HIGH);
     // Mientras no detecte ningun envase se solicitara colocar uno
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Coloca un envase");
     Serial.println("Coloca un envase (caso 0)");
+
     delay(100);
 
     // leer estados de sensores
@@ -168,10 +144,12 @@ void loop()
         // Se MUEVE el motor PAP hasta la posicion de la rampa de salida de LATAS:
         // DERECHA
         // MODIFICAR CON EL VALOR CORRECTO
-        stepper1.moveTo(800);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        digitalWrite(EnablePin, LOW); //ACTIVA DRIVER
+        delay(100);
+        stepper1.moveTo(155);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in  position
-        delay(200);
-      
+        delay(400);
+       // digitalWrite(EnablePin,LOW); //DESACTIVA DRIVER
       }
 
       // Muestra en pantalla que esta DETECTANDO VIDRIO
@@ -184,9 +162,12 @@ void loop()
         // Se mueve el motor PAP hasta la posicion de la rampa de salida de Vidrio:
         // IZQUIERDA
         // MODIFICAR CON EL VALOR CORRECTO
-        stepper1.moveTo(600);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        digitalWrite(EnablePin,LOW);
+        delay(100);
+        stepper1.moveTo(-155);    // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
-        delay(200);
+        delay(400);
+        digitalWrite(EnablePin,HIGH);
       }
 
       // Muestra en pantalla que esta DETECTANDO PET
@@ -197,8 +178,12 @@ void loop()
         delay(200);
         // POSICION CENTRAL, NO ROTA
         // MODIFICAR CON EL VALOR CORRECTO
-        stepper1.moveTo(200);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        digitalWrite(EnablePin,LOW);
+        delay(100);
+        stepper1.moveTo(0);       // Set desired move: 800 steps (in quater-step resolution that's one rotation)
         stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
+        delay(500);
+        digitalWrite(EnablePin,HIGH);     
       }
       else
       {
@@ -210,7 +195,7 @@ void loop()
         Serial.println("No se ha determinado que material se ha ingresado");
       }
 
-      delay(1500);
+      delay(500);
       lcd.clear();
       Estado = 3;
       break;
@@ -232,20 +217,32 @@ void loop()
 
     if (digitalRead(SensorSalida) == HIGH) // Sensore de salida de rampa detecta el envase que ha salido
     {
-    Serial.println("Ha detectado la salida del envase de la rampa");
+      Serial.println("Ha detectado la salida del envase de la rampa");
       lcd.clear();
       lcd.print("Ya quedo jefe");
       delay(100);
       servoMotor.write(0); // Regresa a la posicion inicial(plano, horizontal)
+      delay(1000);
 
       // MODIFICAR VALOR CORRECTO PARA MOVERLO AL CENTRO
       Serial.println("retorna al centro el motor PAP");
+      digitalWrite(EnablePin,LOW);
+      delay(100);
       stepper1.moveTo(0);       // Set desired move: 800 steps (in quater-step resolution that's one rotation)
       stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
+      digitalWrite(EnablePin,HIGH);
+      delay(500);
 
       Serial.println("El sensor al final de la rampa ha detectado la salida del envasase y vuelven los motores a la posicion incial ");
       // Se reinicia la maquina de estados
+      if (digitalRead(sensor_origen)==LOW)
+      {
       Estado = 0;
+      }
+      else {
+      zero_motor();
+      }
+      
     }
     break;
 
@@ -255,7 +252,47 @@ void loop()
     delay(200);
     break;
   }
+} 
+void zero_motor(){
+  //Variables control PAP
+  int i = 0;
+  int lim_inf =-110;
+  int lim_sup = 220;
+  
+  if (digitalRead(sensor_origen) == LOW ){ //Sensor detecta el iman del punto de origen 
+    //Definicion de posicion correcta del origen 
+    stepper1.setCurrentPosition(0); // Set the current position to 0 steps
+    digitalWrite(EnablePin,HIGH); //DESACTIVA
+    return;
+  }
+  else 
+  {
+    while(digitalRead(sensor_origen) == HIGH && i >= lim_inf){ //derecha
+      digitalWrite(EnablePin,LOW);
+      stepper1.moveTo(i);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+      stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
+      i--;
+      Serial.println("wail 1");
+    }
+    if (digitalRead(sensor_origen) == LOW){
+      stepper1.setCurrentPosition(0); // Set the current position to 0 steps
+      digitalWrite(EnablePin,HIGH);
+      return; 
+    }
+    else {  
+      
+      while(digitalRead(sensor_origen) == HIGH && i <= lim_sup){ //izquierda
+        digitalWrite(EnablePin,LOW); //HIGH
+        stepper1.moveTo(i);     // Set desired move: 800 steps (in quater-step resolution that's one rotation)
+        stepper1.runToPosition(); // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
+        i++;
+        Serial.println("wail 2");
+      }
+    }
+  }
+  
 }
+
 /*COMENTARIOS FUNCIONAMIENTO O CONEXION
 
  hall e infra mandan 0 al detectar
