@@ -7,7 +7,7 @@
 // Salidas para driver motor a pasos
 #define DirPin 3                           // Pin dirrecion driver
 #define StepPin 2                          // Pin #pasos driver
-#define EnablePin 4                        // Pin enable driver
+#define EnablePin 22                       // Pin enable driver
 AccelStepper stepper1(1, StepPin, DirPin); // (Type of driver: with 2 pins, STEP, DIR)
 boolean logica_enable = LOW;               // El driver se activa al recibir 0
 
@@ -93,7 +93,7 @@ void loop()
   {
   case 0: // SOLICITA ENVASE
     // Mientras no detecte ningun envase se solicitara colocar uno
-    digitalWrite(EnablePin, !logica_enable); // Desactiva driver PAP
+    digitalWrite(EnablePin, HIGH); // Desactiva driver PAP
     lcd.clear();
     lcd.setCursor(1, 1);
     lcd.print("Coloca  un  envase");
@@ -305,15 +305,15 @@ void loop()
     lcd.setCursor(13, 3);
     lcd.print("NO -->");
 
-    if (digitalRead(BotonSecundario)) // recibe pulso alto indicando que "NO"
-    {
-      lcd.clear();
-      // Muestra el total de envases ingresados
-      lcd.print("Ingresaste x envases de pet, x latas y x de vidrio");
-      contador_envases = 0; // Reinicio de contador de envases
-      Adicion_Envases = LOW;
-      delay(3000);
-      Estado = 0;
+   if (digitalRead(BotonSecundario)) // recibe pulso alto indicando que "NO"
+   {
+     lcd.clear();
+     // Muestra el total de envases ingresados
+     lcd.print("Ingresaste x envases de pet, x latas y x de vidrio");
+     contador_envases = 0; // Reinicio de contador de envases
+     Adicion_Envases = LOW;
+     delay(3000);
+     Estado = 0;
     }
     else if (digitalRead(BotonInicio)) 
     { // recibe pulso alto indicando que "SI"
@@ -334,11 +334,11 @@ void loop()
 void zero_motor()
 { // Esta funcion busca el punto establecido como cero u origen para el funcionamiento del PAP
   // limites
-  int i = 0;
+  int i  = 0;
   if (digitalRead(Pos_Sens_Centro) == LOW) // Sensor detecta el iman de la ubicacion de origen
   {
-    stepper1.setCurrentPosition(0);          // Set the current position to 0 steps
-    digitalWrite(EnablePin, !logica_enable); // Desactiva driver PAP
+    stepper1.setCurrentPosition(0);// Set the current position to 0 steps
+    digitalWrite(EnablePin, HIGH); // Desactiva driver PAP
     Serial.println("CENTRO");
     return;
   }
@@ -347,7 +347,7 @@ void zero_motor()
     // Mientras No detecta el centro ni el sensor de posicion del vidrio
     while ((digitalRead(Pos_Sens_Centro) == HIGH) && digitalRead(Pos_Sens_Vidrio) == HIGH) // Mueve hacia la derecha para buscar el sensor de ese limite
     {                                                                                      // derecha
-      digitalWrite(EnablePin, logica_enable);                                              // Activa driver PAP
+      digitalWrite(EnablePin, LOW);                                              // Activa driver PAP
       stepper1.moveTo(i);                                                                  // Set desired move:
       stepper1.runToPosition();                                                            // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
       i--;
@@ -358,8 +358,8 @@ void zero_motor()
       Serial.println("SEGUNDO IF");
       while (digitalRead(Pos_Sens_Centro) == HIGH) // Mientras no detecta el centro se aproxima a el
       {                                            // Izquierda
-        digitalWrite(EnablePin, logica_enable);    // Activa driver PAP
-        stepper1.moveTo(i);                        // Set desired move:
+        digitalWrite(EnablePin, LOW);    // Activa driver PAP
+        stepper1.moveTo(i);                         // Set desired move:
         stepper1.runToPosition();                  // Moves the motor to target position w/ acceleration/ deceleration and it blocks until is in position
         i++;
         Serial.println("wail IZQUIERDA");
