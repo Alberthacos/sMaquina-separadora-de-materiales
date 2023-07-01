@@ -4,28 +4,28 @@
 #include <Servo.h>
 
 // Entradas de los sensores
-#define SensInd_Alu 2
-#define SensCap_PET 3
-#define SensCap_Vid 4
+#define SensInd_Alu 5
+#define SensCap_PET 6
+#define SensCap_Vid 7
 
 #define Pos_Sens_Centro 24
 #define Pos_Sens_Vidrio 26 // DERECHA
 #define Pos_Sens_LATA 22   // IZQUIERDA
 
 // Pin servomotor
-#define PinServo 8
+#define PinServo 4
 Servo servoMotor;
 
 // Boton que controla el inicio del proceso
-#define BotonInicio 9
-#define BotonSecundario 10
+#define BotonInicio 2
+#define BotonSecundario 3
 // Boton que detecta la salida del envase de la rampa
-#define SensorSalida 28
+#define SensorSalida 12
 
 // Pines control puente H
-#define En 5
-#define In_1 6
-#define In_2 7
+#define En 8
+#define In_1 9
+#define In_2 10
 
 // Variable que controla la secuencia de la maquina de estados
 int Estado;
@@ -96,7 +96,8 @@ void loop()
       Serial.println("Envase detectado, se cambia al estado 1");
       Estado = 1; // Se detecta algun envase, cambia de estado
     }
-    else {
+    else
+    {
       Estado = 0;
     }
     break;
@@ -141,8 +142,6 @@ void loop()
     { // si algun sensor detecta se ejecuta esto
       // MODIFICAR O COMPROBAR SI es necesaria la linea superior
 
-      digitalWrite(En, HIGH);
-
       // Muestra en pantalla que esta DETECTANDO LATA ALUMINIO
       if ((digitalRead(SensInd_Alu) == HIGH) && (digitalRead(SensCap_Vid) == LOW) && (digitalRead(SensCap_PET) == LOW))
       {
@@ -151,9 +150,10 @@ void loop()
         // Se mueve el motor PAP hasta la posicion de la rampa de salida de Lata:  Derecha
         while (digitalRead(Pos_Sens_LATA) == HIGH) // Mientras no detecte la posicion de salida de lata, derecha
         {
+          analogWrite(En, 25);
           // Salidas de motor con sentido horario
-          digitalWrite(In_1, HIGH);
-          digitalWrite(In_2, LOW);
+          digitalWrite(In_1, LOW);
+          digitalWrite(In_2, HIGH);
 
           Serial.println("wail DERECHA");
         }
@@ -166,12 +166,13 @@ void loop()
         lcd.print("Vidrio");
         Serial.println("se detecto Vidrio");
         // delay(200);
+        analogWrite(En, 25);
         //  Se mueve el motor PAP hasta la posicion de la rampa de salida de Vidrio:  IZQUIERDA
         while (digitalRead(Pos_Sens_Vidrio) == HIGH) // Mientras no detecte el sensor de posicion izquierda, salida vidrio
         {                                            // izquierda
           // Salidas de motor con sentido antihorario
-          digitalWrite(In_1, LOW);
-          digitalWrite(In_2, HIGH);
+          digitalWrite(In_1, HIGH);
+          digitalWrite(In_2, LOW);
           Serial.println("wail 1 IZQUIERDA");
         }
         // Posicion_Material = Posicion_Vidrio;
@@ -209,30 +210,26 @@ void loop()
 
       delay(500);
       lcd.clear();
-      Estado = 3;
       digitalWrite(En, LOW);
+      Serial.println("rota 90 grados el servomotor para elevar la rampa");
+      servoMotor.write(90); // Se eleva la rampa con ayuda del servomotor
+      Estado = 3;
 
       break;
     }
     break;
 
   case 3:
+
     /* Indica que el envase se va a depositar en el contenedor
     Activa el servo para empujar el envase y se detecta su salida con un sensor al final de la rampa*/
     lcd.clear();
     lcd.setCursor(1, 1);
     lcd.print("Depositando Envase");
-    if (Adicion_Envases)
-    {
-      lcd.setCursor(2, 3);
-      lcd.print("No de envases:");
-      lcd.setCursor(16, 3);
-      lcd.print(contador_envases);
-    }
-    delay(200);
 
     Serial.println("rota 90 grados el servomotor para elevar la rampa");
     servoMotor.write(90); // Se eleva la rampa con ayuda del servomotor
+    delay(100);
 
     if (digitalRead(SensorSalida) == LOW) // Sensor salida de rampa detecta el envase que ha salido
     {
@@ -241,40 +238,12 @@ void loop()
       lcd.setCursor(3, 1);
       lcd.print("Ya quedo jefe");
 
-      contador_envases++;
-      lcd.setCursor(2, 3);
-      lcd.print("No de envases:");
-      lcd.setCursor(16, 3);
-      lcd.print(contador_envases);
-
       servoMotor.write(0); // Regresa a la posicion inicialservomotor (horizontal)
-      delay(500);
+      delay(100);
+      Estado = 4;
 
       // Vuelve a la posicion de origen el motor PAP
       Serial.println("retorna al centro el motor PAP y a su posicion inicial el servo");
-
-      if (Pos_Sens_Centro == LOW) // ESTA EN EL CENTRO
-      {
-        Estado = 4; // en el estado 4 se pregunta si quiere agregar mas botellas o ya ha finalizado y se activa la
-      }
-      else
-      {
-        if (digitalRead(Pos_Sens_Vidrio) == LOW) // Se encuentra en la posicion de salida del vidrio, izquierda
-        {
-          while (digitalRead(Pos_Sens_Centro == HIGH)) // Mientras no detecte la posicion de centro
-          {
-            Serial.println("wail DERECHA");
-          }
-        }
-        else if (digitalRead(Pos_Sens_LATA) == LOW) // Se encuentra en la posicion de salida del lata, derecha
-        {
-          while (digitalRead(Pos_Sens_Centro == HIGH)) // Mientras no detecte la posicion de centro
-          {
-
-            Serial.println("wail IZQUIERDA");
-          }
-        }
-      }
 
       // Se reinicia la maquina de estados
       // variable adicion envases
@@ -282,29 +251,8 @@ void loop()
     break;
 
   case 4:
-    lcd.clear();
-    lcd.setCursor(0, 1);
-    lcd.print("Agregar mas envases?");
-    lcd.setCursor(0, 3);
-    lcd.print("<-- SI ");
-    lcd.setCursor(13, 3);
-    lcd.print("NO -->");
-
-    if (digitalRead(BotonSecundario)) // recibe pulso alto indicando que "NO"
-    {
-      lcd.clear();
-      // Muestra el total de envases ingresados
-      lcd.print("Ingresaste x envases de pet, x latas y x de vidrio");
-      contador_envases = 0; // Reinicio de contador de envases
-      Adicion_Envases = LOW;
-      delay(3000);
-      Estado = 0;
-    }
-    else if (digitalRead(BotonInicio))
-    { // recibe pulso alto indicando que "SI"
-      Adicion_Envases = HIGH;
-      Estado = 0;
-    }
+    zero_motor();
+    Estado = 0;
     break;
 
   default:
@@ -344,29 +292,29 @@ void zero_motor()
   }
   //
 
-if (digitalRead(Pos_Sens_Centro) == LOW)
-{
-  Serial.println("CENTRO ENCONTRADO");
-  digitalWrite(En, LOW);
-  return;
-}
-//
-// if (digitalRead(Pos_Sens_Centro == LOW))
-//{
-//  Serial.println("CENTRO ENCONTRADO");
-//  digitalWrite(En, LOW);
-//  return;
-//}
-//
-//// if (digitalRead(Pos_Sens_Vidrio) == LOW) // DETECTA EL SENSOR DE LA DERECHA
-//{
-//   while (digitalRead(Pos_Sens_Centro) == HIGH) // Mientras no detecta el centro se aproxima a el
-//   {                                            // Izquierda
-//     digitalWrite(In_1, LOW);
-//     digitalWrite(In_2, HIGH);
-//     Serial.println("wail IZQUIERDA");
-//   }
-// }
+  if (digitalRead(Pos_Sens_Centro) == LOW)
+  {
+    Serial.println("CENTRO ENCONTRADO");
+    digitalWrite(En, LOW);
+    return;
+  }
+  //
+  // if (digitalRead(Pos_Sens_Centro == LOW))
+  //{
+  //  Serial.println("CENTRO ENCONTRADO");
+  //  digitalWrite(En, LOW);
+  //  return;
+  //}
+  //
+  //// if (digitalRead(Pos_Sens_Vidrio) == LOW) // DETECTA EL SENSOR DE LA DERECHA
+  //{
+  //   while (digitalRead(Pos_Sens_Centro) == HIGH) // Mientras no detecta el centro se aproxima a el
+  //   {                                            // Izquierda
+  //     digitalWrite(In_1, LOW);
+  //     digitalWrite(In_2, HIGH);
+  //     Serial.println("wail IZQUIERDA");
+  //   }
+  // }
 }
 
 /*COMENTARIOS FUNCIONAMIENTO O CONEXION
